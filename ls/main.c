@@ -1,9 +1,15 @@
 #include <argp.h>
 #include <dirent.h>
 #include <limits.h>
+#include <stdio.h>
 #include <stdlib.h>
+#include <string.h>
+#include <sys/stat.h>
 #include <unistd.h>
 
+/*
+ * CLI arguments
+ */
 static struct argp_option options[] = {
 	{"list", 'l', 0, 0, "Show a detailed list"},
 };
@@ -28,19 +34,66 @@ static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 
 static struct argp argp = {options, parse_opt, 0, ""};
 
-static void list_dirs(const char *path) {
+/*
+ * ls command types
+ */
+typedef struct {
+	char *name;
+	unsigned char is_dir;
+	long size;
+
+} LsEntry;
+
+typedef struct {
+	int count;
+	LsEntry **entries;
+} Directory;
+
+char* make_path(const char* path, const char *file) {
+	char *filename;
+
+	asprintf(&filename, "%s/%s", path, file);
+	printf("filename: %s\n", filename);
+	return filename;
+}
+
+Directory* collect_entries(const char *path) {
 	struct dirent *entry;
 	DIR *dir = opendir(path);
 
+	Directory *currentDirectory = (Directory*) malloc(sizeof(Directory));
+	currentDirectory->entries = (LsEntry**) malloc(sizeof(LsEntry*));
+	currentDirectory->count = 1;
+
 	if(dir == NULL) {
-		return;
+                return NULL;
 	}
 
 	while((entry = readdir(dir)) != NULL) {
-		printf("%s\n", entry->d_name);
+		if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
+			continue;
+		}
+
+		char *name;
+		asprintf(&name, "%s", entry->d_name);
+		char *filename = make_path(path, entry->d_name);
+		struct stat *buf = malloc(sizeof(struct stat));
+		stat(filename, buf);
+
+		LsEntry *currEntry = (LsEntry*) malloc(sizeof(currEntry));
+		currEntry->name = name;
+		currEntry->is_dir = (entry->d_type == DT_DIR ? 1 : 0);
+		currEntry->size = buf->st_size;
+		currentDirectory->entries[currentDirectory->count - 1] = currEntry;
+
+		free(buf);
+
+		currentDirectory->count++;
+		currentDirectory->entries = realloc(currentDirectory->entries, currentDirectory->count * sizeof(LsEntry));
 	}
 
 	closedir(dir);
+	return currentDirectory;
 }
 
 
@@ -58,8 +111,21 @@ int main(int argc, char **argv) {
 
 	printf("Current working directory is %s\n", cwd);
 
-	list_dirs(cwd);
+	Directory *result = collect_entries(cwd);
+	printf("Count %d\n", result->count - 1);
 
+	for(int i = 0; i < result->count - 1; i++) {
+		LsEntry *entry = result->entries[i];
+		if(entry == NULL) {
+			printf("entry %d is null", i);
+		}
+		printf("%s -", entry->name);
+		printf("%c -", entry->is_dir);
+		printf("%ld", entry->size);
+	}
+
+	free(result->entries);
+	free(result);
 
 	exit(0);
 }

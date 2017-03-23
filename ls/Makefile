@@ -1,5 +1,5 @@
 P=ls
-CFLAGS= -g -O3
+CFLAGS=-std=c99 -g -O3
 INCLUDE=-I/usr/local/opt/argp-standalone/include
 LDLIBS=-L/usr/local/opt/argp-standalone/ -largp
 LDFLAGS=-rdynamic
