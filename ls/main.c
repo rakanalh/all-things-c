@@ -1,6 +1,7 @@
+#define _GNU_SOURCE
 #include <argp.h>
 #include <dirent.h>
-#include <limits.h>
+#include <linux/limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -62,7 +63,7 @@ Directory* collect_entries(const char *path) {
 	DIR *dir = opendir(path);
 
 	Directory *currentDirectory = (Directory*) malloc(sizeof(Directory));
-	currentDirectory->entries = (LsEntry**) malloc(sizeof(LsEntry*));
+	currentDirectory->entries = (LsEntry**) malloc(sizeof(currentDirectory->entries));
 	currentDirectory->count = 1;
 
 	if(dir == NULL) {
@@ -89,7 +90,7 @@ Directory* collect_entries(const char *path) {
 		free(buf);
 
 		currentDirectory->count++;
-		currentDirectory->entries = realloc(currentDirectory->entries, currentDirectory->count * sizeof(LsEntry));
+		currentDirectory->entries = realloc(currentDirectory->entries, currentDirectory->count * sizeof(LsEntry*));
 	}
 
 	closedir(dir);
@@ -120,8 +121,8 @@ int main(int argc, char **argv) {
 			printf("entry %d is null", i);
 		}
 		printf("%s -", entry->name);
-		printf("%c -", entry->is_dir);
-		printf("%ld", entry->size);
+		printf("%s -", entry->is_dir == 1 ? "Yes" : "No");
+		printf("%ld\n", entry->size);
 	}
 
 	free(result->entries);
