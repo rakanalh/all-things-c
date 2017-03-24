@@ -1,7 +1,7 @@
 #define _GNU_SOURCE
 #include <argp.h>
 #include <dirent.h>
-#include <linux/limits.h>
+#include <limits.h>
 #include <stdio.h>
 #include <stdlib.h>
 #include <string.h>
@@ -50,11 +50,29 @@ typedef struct {
 	LsEntry **entries;
 } Directory;
 
+Directory *directory_new() {
+	Directory *currentDirectory = (Directory*) malloc(sizeof(Directory));
+	// malloc one entry ahead
+	currentDirectory->entries = (LsEntry**) malloc(sizeof(LsEntry));
+	currentDirectory->count = 1;
+	return currentDirectory;
+}
+
+void directory_free(Directory *directory) {
+	for(int i = 0; i < directory->count - 1; i++) {
+		if(directory->entries[i] == NULL) continue;
+		free(directory->entries[i]);
+	}
+	free(directory->entries);
+	free(directory);
+}
+
+/*
+ * make_path concatenates path and filename
+ */
 char* make_path(const char* path, const char *file) {
 	char *filename;
-
 	asprintf(&filename, "%s/%s", path, file);
-	printf("filename: %s\n", filename);
 	return filename;
 }
 
@@ -62,35 +80,43 @@ Directory* collect_entries(const char *path) {
 	struct dirent *entry;
 	DIR *dir = opendir(path);
 
-	Directory *currentDirectory = (Directory*) malloc(sizeof(Directory));
-	currentDirectory->entries = (LsEntry**) malloc(sizeof(currentDirectory->entries));
-	currentDirectory->count = 1;
-
 	if(dir == NULL) {
                 return NULL;
 	}
 
+	Directory *currentDirectory = directory_new();
 	while((entry = readdir(dir)) != NULL) {
 		if(strcmp(entry->d_name, ".") == 0 || strcmp(entry->d_name, "..") == 0) {
 			continue;
 		}
 
+		// Copy name
 		char *name;
 		asprintf(&name, "%s", entry->d_name);
+
+		// Construct full file name
 		char *filename = make_path(path, entry->d_name);
+
+		// Fetch file size info
 		struct stat *buf = malloc(sizeof(struct stat));
 		stat(filename, buf);
+		free(filename);
 
-		LsEntry *currEntry = (LsEntry*) malloc(sizeof(currEntry));
+		// Create entry
+		LsEntry *currEntry = (LsEntry*) malloc(sizeof(LsEntry));
 		currEntry->name = name;
 		currEntry->is_dir = (entry->d_type == DT_DIR ? 1 : 0);
 		currEntry->size = buf->st_size;
+
+		// Populate the previously malloc'ed location
 		currentDirectory->entries[currentDirectory->count - 1] = currEntry;
 
+		// This takes place
 		free(buf);
 
 		currentDirectory->count++;
-		currentDirectory->entries = realloc(currentDirectory->entries, currentDirectory->count * sizeof(LsEntry*));
+		// malloc one entry ahead
+		currentDirectory->entries = realloc(currentDirectory->entries, currentDirectory->count * sizeof(LsEntry));
 	}
 
 	closedir(dir);
@@ -125,8 +151,7 @@ int main(int argc, char **argv) {
 		printf("%ld\n", entry->size);
 	}
 
-	free(result->entries);
-	free(result);
+	directory_free(result);
 
 	exit(0);
 }
