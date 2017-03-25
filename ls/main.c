@@ -98,21 +98,18 @@ Directory* collect_entries(const char *path) {
 		char *filename = make_path(path, entry->d_name);
 
 		// Fetch file size info
-		struct stat *buf = malloc(sizeof(struct stat));
-		stat(filename, buf);
+		struct stat buf;
+		stat(filename, &buf);
 		free(filename);
 
 		// Create entry
 		LsEntry *currEntry = (LsEntry*) malloc(sizeof(LsEntry));
 		currEntry->name = name;
 		currEntry->is_dir = (entry->d_type == DT_DIR ? 1 : 0);
-		currEntry->size = buf->st_size;
+		currEntry->size = buf.st_size;
 
 		// Populate the previously malloc'ed location
 		currentDirectory->entries[currentDirectory->count - 1] = currEntry;
-
-		// This takes place
-		free(buf);
 
 		currentDirectory->count++;
 		// malloc one entry ahead
