@@ -1,29 +1,34 @@
-#define _GNU_SOURCE
 #include <argp.h>
-#include <dirent.h>
 #include <limits.h>
-#include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
-#include <sys/stat.h>
-#include <unistd.h>
+#include "ls.h"
 
 /*
  * CLI arguments
  */
 static struct argp_option options[] = {
-	{"list", 'l', 0, 0, "Show a detailed list"},
+	{"size", 's', 0, 0, "Show size"},
+	{"owner", 'o', 0, 0, "Show owner"},
+	{"permissions", 'p', 0, 0, "Show permissions"}
 };
 
 struct arguments {
-	short list;
+	unsigned char size;
+	unsigned char owner;
+	unsigned char permissions;
 };
 
 static error_t parse_opt(int key, char *arg, struct argp_state *state) {
 	struct arguments *arguments = state->input;
 	switch(key) {
-	case 'l':
-		arguments->list = 1;
+	case 's':
+		arguments->size = 1;
+		break;
+	case 'o':
+		arguments->owner = 1;
+		break;
+	case 'p':
+		arguments->permissions = 1;
 		break;
 	case ARGP_KEY_END:
 		break;
@@ -120,10 +125,8 @@ Directory* collect_entries(const char *path) {
 	return currentDirectory;
 }
 
-
 int main(int argc, char **argv) {
 	struct arguments arguments;
-	arguments.list = 0;
 	argp_parse(&argp, argc, argv, 0, 0, &arguments);
 
 	char cwd[PATH_MAX];
@@ -133,22 +136,47 @@ int main(int argc, char **argv) {
 		printf("Could not fetch currect working directory\n");
 	}
 
-	printf("Current working directory is %s\n", cwd);
+	Options options = 0;
+	if(arguments.size) {
+		options |= SIZE;
+	}
+	if(arguments.owner) {
+		options |= OWNER;
+	}
+	if(arguments.permissions) {
+		options |= PERMISSIONS;
+	}
 
-	Directory *result = collect_entries(cwd);
-	printf("Count %d\n", result->count - 1);
+	Directory *directory = collect_entries(cwd, options);
 
-	for(int i = 0; i < result->count - 1; i++) {
-		LsEntry *entry = result->entries[i];
+	for(int i = 0; i < directory->count - 1; i++) {
+		LsEntry *entry = directory->entries[i];
 		if(entry == NULL) {
 			printf("entry %d is null", i);
 		}
-		printf("%s -", entry->name);
-		printf("%s -", entry->is_dir == 1 ? "Yes" : "No");
-		printf("%ld\n", entry->size);
+
+		if(arguments.permissions) {
+			printf("%-20s", entry->permissions);
+		}
+
+		if(arguments.owner) {
+			char *owner;
+			asprintf(&owner, "%s:%s", entry->owner, entry->group);
+			printf("%-20s", owner);
+		}
+
+		if(arguments.size) {
+			printf("%-10s", entry->size);
+		}
+
+		printf("%-10s", entry->name);
+		if(entry->is_link) {
+			printf(" -> %s", entry->link_target);
+		}
+		printf("\n");
 	}
 
-	directory_free(result);
+	directory_free(directory);
 
 	exit(0);
 }
